@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base { * { box-sizing: border-box; } body { margin: 0; min-width: 320px; background: #17261d; color: #17261d; font-family: Inter, system-ui, sans-serif; } button, input { font: inherit; } button { -webkit-tap-highlight-color: transparent; } }
+@layer components {
+  .panel { @apply absolute bottom-16 left-1/2 z-20 max-h-[72dvh] w-[min(94%,760px)] -translate-x-1/2 overflow-auto rounded-t-3xl border border-white/40 bg-cream/95 p-5 shadow-2xl backdrop-blur sm:bottom-20 sm:rounded-3xl; }
+  .field { @apply block text-xs font-bold uppercase tracking-wider text-ink/60; }
+  .field input { @apply mt-1.5 w-full rounded-xl border border-ink/15 bg-white px-4 py-3 text-base font-normal normal-case tracking-normal text-ink outline-none transition focus:border-moss focus:ring-2 focus:ring-moss/20; }
+  .property-tier-1 { background: linear-gradient(145deg, #789b57, #426a4b); }
+  .property-tier-2 { background: linear-gradient(145deg, #c87941, #8b5e3c); }
+  .property-tier-3 { background: linear-gradient(145deg, #376a8b, #17261d); }
+}

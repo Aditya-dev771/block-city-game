@@ -1,0 +1,101 @@
+name: Private Alpha Validation
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: alpha-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Full Supabase and application gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      SUPABASE_CLI_VERSION: 2.117.0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Show toolchain
+        run: |
+          node --version
+          npm --version
+          docker --version
+          npx --yes supabase@${SUPABASE_CLI_VERSION} --version
+
+      - name: Start disposable local Supabase
+        run: npx --yes supabase@${SUPABASE_CLI_VERSION} start
+
+      - name: Export local-only runtime credentials
+        shell: bash
+        run: |
+          npx --yes supabase@${SUPABASE_CLI_VERSION} status -o env > /tmp/supabase.env
+          set -a
+          source /tmp/supabase.env
+          set +a
+          echo "API_URL=$API_URL" >> "$GITHUB_ENV"
+          echo "ANON_KEY=$ANON_KEY" >> "$GITHUB_ENV"
+          echo "SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
+          echo "DB_URL=$DB_URL" >> "$GITHUB_ENV"
+
+      - name: Reset database and apply complete migration history
+        run: npx --yes supabase@${SUPABASE_CLI_VERSION} db reset
+
+      - name: Run all pgTAP suites
+        run: npx --yes supabase@${SUPABASE_CLI_VERSION} test db
+
+      - name: Run authenticated RPC, RLS, idempotency, and concurrency smoke tests
+        run: npm run test:runtime
+
+      - name: Verify Edge Function starts and handles CORS
+        shell: bash
+        run: |
+          npx --yes supabase@${SUPABASE_CLI_VERSION} functions serve game-action > /tmp/game-action.log 2>&1 &
+          echo $! > /tmp/game-action.pid
+          for attempt in {1..30}; do
+            if curl --silent --fail --request OPTIONS http://127.0.0.1:54321/functions/v1/game-action > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/game-action.log
+          exit 1
+
+      - name: Unit tests
+        run: npm test
+
+      - name: TypeScript
+        run: npm run typecheck
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Production build
+        run: npm run build
+
+      - name: Capture Supabase diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          npx --yes supabase@${SUPABASE_CLI_VERSION} status || true
+          docker ps -a || true
+          test -f /tmp/game-action.log && cat /tmp/game-action.log || true
+
+      - name: Stop disposable services
+        if: always()
+        run: npx --yes supabase@${SUPABASE_CLI_VERSION} stop --no-backup || true

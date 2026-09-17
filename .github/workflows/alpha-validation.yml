@@ -16,7 +16,7 @@ permissions:
 env:
   NODE_VERSION: 20
   SUPABASE_CLI_VERSION: 2.117.0
-  SUPABASE_IMAGE_CACHE_KEY: supabase-images-2.117.0-postgres-15.8.1.085-gotrue-v2.196.0-postgrest-v16.2-kong-2.8.1-edge-v1.74.3
+  SUPABASE_IMAGE_CACHE_KEY: supabase-images-2.117.0-postgres-15.8.1.085-gotrue-v2.196.0-realtime-v2.130.0-storage-v1.72.1-postgrest-v16.2-kong-2.8.1-edge-v1.74.3
 
 jobs:
   app-validation:

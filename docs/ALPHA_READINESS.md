@@ -47,10 +47,18 @@ The same startup path also requires:
 - `public.ecr.aws/supabase/postgrest:v16.2`
 - `public.ecr.aws/supabase/edge-runtime:v1.74.3`
 
+The first split `DATABASE_VALIDATION` run also showed that `supabase db start` under CLI `2.117.0` pulls additional schema-initialization images even before full runtime validation:
+
+- `public.ecr.aws/supabase/realtime:v2.130.0`
+- `public.ecr.aws/supabase/storage-api:v1.72.1`
+- `public.ecr.aws/supabase/gotrue:v2.196.0`
+
 The workflow now pre-pulls trusted exact-version mirrors before Supabase startup and tags them locally with the Public ECR names expected by the CLI:
 
 - `supabase/postgres:15.8.1.085` -> `public.ecr.aws/supabase/postgres:15.8.1.085`
 - `supabase/gotrue:v2.196.0` -> `public.ecr.aws/supabase/gotrue:v2.196.0`
+- `supabase/realtime:v2.130.0` -> `public.ecr.aws/supabase/realtime:v2.130.0`
+- `supabase/storage-api:v1.72.1` -> `public.ecr.aws/supabase/storage-api:v1.72.1`
 - `postgrest/postgrest:v16.2` -> `public.ecr.aws/supabase/postgrest:v16.2`
 - `kong:2.8.1` -> `public.ecr.aws/supabase/kong:2.8.1`
 - `supabase/edge-runtime:v1.74.3` -> `public.ecr.aws/supabase/edge-runtime:v1.74.3`
@@ -70,7 +78,7 @@ Optional local services remain excluded from CI: Realtime, Storage API, imgproxy
 
 Current execution status remains **BLOCKED** until the updated workflow runs green:
 
-- Migration 7 runtime status: NEEDS TESTING
+- Migration 7 runtime status: FAILED ON UNSUPPORTED FUNCTION GUC; migration 8 added for body-local conflict correction
 - pgTAP status: NEEDS TESTING
 - Runtime smoke status: NEEDS TESTING
 - Concurrency status: NEEDS TESTING

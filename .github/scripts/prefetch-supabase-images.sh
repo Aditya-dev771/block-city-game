@@ -9,6 +9,9 @@ mkdir -p "${cache_dir}"
 if [ "${profile}" = "database" ]; then
   image_map=(
     "public.ecr.aws/supabase/postgres:15.8.1.085|supabase/postgres:15.8.1.085|Supabase Docker Hub postgres mirror"
+    "public.ecr.aws/supabase/realtime:v2.130.0|supabase/realtime:v2.130.0|Supabase Docker Hub realtime mirror required by db start schema initialization"
+    "public.ecr.aws/supabase/storage-api:v1.72.1|supabase/storage-api:v1.72.1|Supabase Docker Hub storage-api mirror required by db start schema initialization"
+    "public.ecr.aws/supabase/gotrue:v2.196.0|supabase/gotrue:v2.196.0|Supabase Docker Hub gotrue mirror required by db start schema initialization"
   )
 else
   image_map=(

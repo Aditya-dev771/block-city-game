@@ -41,7 +41,19 @@ jobs:
           npx --yes supabase@${SUPABASE_CLI_VERSION} --version
 
       - name: Start disposable local Supabase
-        run: npx --yes supabase@${SUPABASE_CLI_VERSION} start
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if npx --yes supabase@${SUPABASE_CLI_VERSION} start; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            echo "Supabase startup attempt $attempt failed; retaining pulled layers and retrying."
+            npx --yes supabase@${SUPABASE_CLI_VERSION} stop --no-backup || true
+            sleep $((attempt * 15))
+          done
 
       - name: Export local-only runtime credentials
         shell: bash

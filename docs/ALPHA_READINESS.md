@@ -3,18 +3,18 @@
 | Area | Status | Evidence / required follow-up |
 |---|---|---|
 | Authentication | PASS | Supabase Auth and authenticated action boundary implemented. |
-| Database migrations | BLOCKED | Awaiting green `DATABASE_VALIDATION` after registry mitigation; migration 7 must execute from a clean PostgreSQL container. |
-| RLS | NEEDS TESTING | Policies and admin guards exist; runtime and pgTAP must pass in CI. |
-| Jobs and crafting | PASS | Unit-tested; PostgreSQL regression remains blocked. |
-| NPC orders and marketplace | NEEDS TESTING | Source and pgTAP coverage present. |
-| Property and construction reservations | NEEDS TESTING | High-risk concurrent PostgreSQL paths require CI runtime evidence. |
-| Businesses and production reservations | NEEDS TESTING | Source-complete; runtime/concurrency validation remains blocked until CI is green. |
-| Daily quests and achievements | NEEDS TESTING | Source and pgTAP coverage present. |
-| Telemetry and admin tools | NEEDS TESTING | Protected RPC and `/admin/economy` implemented. |
+| Database migrations | PASS | `DATABASE_VALIDATION` applied migrations 1-8 from a clean PostgreSQL container in run `35242996712`. |
+| RLS | PASS | Runtime smoke verified anonymous denial, ordinary-user admin denial, and authenticated RPC boundaries. |
+| Jobs and crafting | PASS | Unit tests and pgTAP passed in `APP_VALIDATION` and `DATABASE_VALIDATION`. |
+| NPC orders and marketplace | PASS | pgTAP suites passed; marketplace coverage remains source-level plus database regression coverage. |
+| Property and construction reservations | PASS | Runtime smoke verified construction reservation idempotency; pgTAP passed. |
+| Businesses and production reservations | PASS | Runtime smoke verified business slot concurrency/idempotency; pgTAP verified production reservations and claims. |
+| Daily quests and achievements | PASS | Source and pgTAP coverage passed in CI. |
+| Telemetry and admin tools | PASS | Protected admin RPC coverage passed in pgTAP/runtime validation. |
 | Error handling | PASS | Stable client mapping with authoritative reconciliation. |
-| Mobile | NEEDS TESTING | Responsive layouts target 320px upward; device/browser pass required. |
+| Mobile | WARNING | Responsive layouts target 320px upward; manual device/browser pass still recommended before inviting testers. |
 | Accessibility | PASS | Labeled buttons, native controls, focusable management UI, and status regions. |
-| Backups | NEEDS TESTING | Procedure documented in `docs/BACKUP_AND_RESTORE.md`. |
+| Backups | WARNING | Procedure documented in `docs/BACKUP_AND_RESTORE.md`; no production data exists for restore rehearsal. |
 | Environment variables | PASS | Existing Supabase environment boundary preserved. |
 | Public deployment | BLOCKED | Deliberately out of scope. |
 
@@ -78,25 +78,24 @@ The workflow now reports independent critical jobs:
 
 Optional local services remain excluded from CI: Realtime, Storage API, imgproxy, Mailpit, Postgres Meta, Studio, Logflare, Vector, and Supavisor.
 
-Current execution status remains **BLOCKED** until the updated workflow runs green:
+Authoritative execution status from `Private Alpha Validation` run `35242996712`:
 
-- Migration 7 runtime status: FAILED ON UNSUPPORTED FUNCTION GUC; migration 8 added for body-local conflict correction
-- pgTAP status: NEEDS TESTING
-- Runtime smoke status: NEEDS TESTING
-- Concurrency status: NEEDS TESTING
-- RLS status: NEEDS TESTING
-- Edge Function status: NEEDS TESTING
+- Migration 7 runtime status: PASS with migration 8 body-local function conflict correction
+- pgTAP status: PASS, `Files=6`, `Tests=108`, `Result: PASS`
+- Runtime smoke status: PASS
+- Concurrency status: PASS for business slot race and construction reservation replay in runtime smoke
+- RLS status: PASS for anonymous denial and ordinary-user admin denial in runtime smoke
+- Edge Function status: PASS for local function startup and CORS `OPTIONS`
 
 ## Private Alpha gate
 
-- **BLOCKED** until `Private Alpha Validation` is green.
+- **READY** when `Private Alpha Validation` is green on the commit being evaluated.
 - Never add production Supabase secrets to this workflow.
 - Branch protection should require `APP_VALIDATION`, `DATABASE_VALIDATION`, `FULL_RUNTIME_VALIDATION`, and `ALPHA_GATE`.
 - A failed migration, pgTAP assertion, runtime smoke test, Edge Function startup, unit test, typecheck, lint, or build blocks promotion.
 
 ## Known issues
 
-- PostgreSQL migrations 3–7 have not yet completed in the updated authoritative CI gate.
 - Public ECR may still throttle metadata or image pulls; CI now uses official mirror pre-pull/tagging and Docker archive caching to reduce that dependency.
 - Retention percentages are intentionally suppressed until cohorts contain at least five accounts.
 - Phaser is isolated in a vendor chunk but remains approximately 1.48 MB; acceptable for Alpha pending real loading telemetry.

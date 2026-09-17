@@ -52,6 +52,7 @@ The first split `DATABASE_VALIDATION` run also showed that `supabase db start` u
 - `public.ecr.aws/supabase/realtime:v2.130.0`
 - `public.ecr.aws/supabase/storage-api:v1.72.1`
 - `public.ecr.aws/supabase/gotrue:v2.196.0`
+- `public.ecr.aws/supabase/pg_prove:3.36`
 
 The workflow now pre-pulls trusted exact-version mirrors before Supabase startup and tags them locally with the Public ECR names expected by the CLI:
 
@@ -59,6 +60,7 @@ The workflow now pre-pulls trusted exact-version mirrors before Supabase startup
 - `supabase/gotrue:v2.196.0` -> `public.ecr.aws/supabase/gotrue:v2.196.0`
 - `supabase/realtime:v2.130.0` -> `public.ecr.aws/supabase/realtime:v2.130.0`
 - `supabase/storage-api:v1.72.1` -> `public.ecr.aws/supabase/storage-api:v1.72.1`
+- `supabase/pg_prove:3.36` -> `public.ecr.aws/supabase/pg_prove:3.36`
 - `postgrest/postgrest:v16.2` -> `public.ecr.aws/supabase/postgrest:v16.2`
 - `kong:2.8.1` -> `public.ecr.aws/supabase/kong:2.8.1`
 - `supabase/edge-runtime:v1.74.3` -> `public.ecr.aws/supabase/edge-runtime:v1.74.3`

@@ -12,6 +12,7 @@ if [ "${profile}" = "database" ]; then
     "public.ecr.aws/supabase/realtime:v2.130.0|supabase/realtime:v2.130.0|Supabase Docker Hub realtime mirror required by db start schema initialization"
     "public.ecr.aws/supabase/storage-api:v1.72.1|supabase/storage-api:v1.72.1|Supabase Docker Hub storage-api mirror required by db start schema initialization"
     "public.ecr.aws/supabase/gotrue:v2.196.0|supabase/gotrue:v2.196.0|Supabase Docker Hub gotrue mirror required by db start schema initialization"
+    "public.ecr.aws/supabase/pg_prove:3.36|supabase/pg_prove:3.36|Supabase Docker Hub pg_prove mirror required by supabase test db"
   )
 else
   image_map=(
@@ -20,6 +21,7 @@ else
     "public.ecr.aws/supabase/postgrest:v16.2|postgrest/postgrest:v16.2|PostgREST official Docker Hub image"
     "public.ecr.aws/supabase/kong:2.8.1|kong:2.8.1|Kong official Docker Hub image"
     "public.ecr.aws/supabase/edge-runtime:v1.74.3|supabase/edge-runtime:v1.74.3|Supabase Docker Hub edge-runtime mirror"
+    "public.ecr.aws/supabase/pg_prove:3.36|supabase/pg_prove:3.36|Supabase Docker Hub pg_prove mirror required by supabase test db"
   )
 fi
 

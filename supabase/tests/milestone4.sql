@@ -31,7 +31,7 @@ select is((select work_state from public.residents where player_id=auth.uid()),'
 select throws_like(format('select public.claim_business_production(%L,%L)',(select id from public.business_productions where player_id=auth.uid()),'40000000-0000-4000-8000-000000000007'),'%PRODUCTION_NOT_READY%','early claim rejected');
 select public.set_current_location('farm');
 select throws_like($$select public.execute_job('farmer','40000000-0000-4000-8000-000000000008')$$,'%RESIDENT_PRODUCING%','job blocked while producing');
-reset role; update public.business_productions set ready_at=now()-interval '1 second' where player_id='44444444-4444-4444-8444-444444444444';
+reset role; update public.business_productions set started_at=now()-interval '2 seconds',ready_at=now()-interval '1 second' where player_id='44444444-4444-4444-8444-444444444444';
 set local role authenticated; select set_config('request.jwt.claim.sub','44444444-4444-4444-8444-444444444444',true);
 select lives_ok(format('select public.claim_business_production(%L,%L)',(select id from public.business_productions where player_id=auth.uid()),'40000000-0000-4000-8000-000000000009'),'ready production claims');
 select is((select amount from public.player_resources where player_id=auth.uid() and resource='meals'),2,'claim converts reservation to Meals once');

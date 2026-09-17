@@ -13,47 +13,163 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  NODE_VERSION: 20
+  SUPABASE_CLI_VERSION: 2.117.0
+  SUPABASE_IMAGE_CACHE_KEY: supabase-images-2.117.0-postgres-15.8.1.085-gotrue-v2.196.0-postgrest-v16.2-kong-2.8.1-edge-v1.74.3
+
 jobs:
-  validate:
-    name: Full Supabase and application gate
+  app-validation:
+    name: APP_VALIDATION
     runs-on: ubuntu-latest
-    timeout-minutes: 35
-    env:
-      SUPABASE_CLI_VERSION: 2.117.0
-      # Keep only Postgres, Auth, PostgREST, Kong, and Edge Runtime. The
-      # validation gate does not use these UI/analytics/storage services.
-      SUPABASE_EXCLUDED_SERVICES: realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,logflare,vector,supavisor
+    timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Use Node.js 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
+      - name: Unit tests
+        run: npm test
+
+      - name: TypeScript
+        run: npm run typecheck
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Production build
+        run: npm run build
+
+  database-validation:
+    name: DATABASE_VALIDATION
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      SUPABASE_IMAGE_PROFILE: database
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Restore Supabase image cache
+        uses: actions/cache@v5
+        with:
+          path: /tmp/supabase-image-cache
+          key: ${{ env.SUPABASE_IMAGE_CACHE_KEY }}-${{ runner.os }}-${{ runner.arch }}-database
+
       - name: Show toolchain
         run: |
           node --version
           npm --version
-          docker --version
+          docker version
+          docker info
           npx --yes supabase@${SUPABASE_CLI_VERSION} --version
 
-      - name: Start disposable local Supabase
+      - name: Prefetch required Supabase database images
+        run: bash .github/scripts/prefetch-supabase-images.sh
+
+      - name: Start PostgreSQL-only Supabase database
         shell: bash
         run: |
-          for attempt in 1 2 3; do
+          for attempt in 1 2 3 4; do
+            if npx --yes supabase@${SUPABASE_CLI_VERSION} db start; then
+              exit 0
+            fi
+            echo "DATABASE_VALIDATION startup attempt ${attempt} failed."
+            docker images || true
+            if [ "${attempt}" -eq 4 ]; then
+              exit 1
+            fi
+            npx --yes supabase@${SUPABASE_CLI_VERSION} stop --no-backup || true
+            sleep $((attempt * 15))
+          done
+
+      - name: Reset database and apply complete migration history
+        run: npx --yes supabase@${SUPABASE_CLI_VERSION} db reset
+
+      - name: Run all pgTAP suites
+        run: npx --yes supabase@${SUPABASE_CLI_VERSION} test db
+
+      - name: Capture database diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          npx --yes supabase@${SUPABASE_CLI_VERSION} --version || true
+          npx --yes supabase@${SUPABASE_CLI_VERSION} status || true
+          docker version || true
+          docker info || true
+          docker images || true
+          docker ps -a || true
+
+      - name: Stop disposable database
+        if: always()
+        run: npx --yes supabase@${SUPABASE_CLI_VERSION} stop --no-backup || true
+
+  runtime-validation:
+    name: FULL_RUNTIME_VALIDATION
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SUPABASE_IMAGE_PROFILE: runtime
+      SUPABASE_EXCLUDED_SERVICES: realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,logflare,vector,supavisor
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Restore Supabase image cache
+        uses: actions/cache@v5
+        with:
+          path: /tmp/supabase-image-cache
+          key: ${{ env.SUPABASE_IMAGE_CACHE_KEY }}-${{ runner.os }}-${{ runner.arch }}-runtime
+
+      - name: Show toolchain
+        run: |
+          node --version
+          npm --version
+          docker version
+          docker info
+          npx --yes supabase@${SUPABASE_CLI_VERSION} --version
+
+      - name: Prefetch required Supabase runtime images
+        run: bash .github/scripts/prefetch-supabase-images.sh
+
+      - name: Start disposable local Supabase runtime
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4; do
             if npx --yes supabase@${SUPABASE_CLI_VERSION} start -x "${SUPABASE_EXCLUDED_SERVICES}"; then
               exit 0
             fi
-            if [ "$attempt" -eq 3 ]; then
+            echo "FULL_RUNTIME_VALIDATION startup attempt ${attempt} failed."
+            docker images || true
+            if [ "${attempt}" -eq 4 ]; then
               exit 1
             fi
-            echo "Supabase startup attempt $attempt failed; retaining pulled layers and retrying."
             npx --yes supabase@${SUPABASE_CLI_VERSION} stop --no-backup || true
             sleep $((attempt * 15))
           done
@@ -91,26 +207,38 @@ jobs:
           cat /tmp/game-action.log
           exit 1
 
-      - name: Unit tests
-        run: npm test
-
-      - name: TypeScript
-        run: npm run typecheck
-
-      - name: ESLint
-        run: npm run lint
-
-      - name: Production build
-        run: npm run build
-
-      - name: Capture Supabase diagnostics
+      - name: Capture runtime diagnostics
         if: failure()
         shell: bash
         run: |
+          npx --yes supabase@${SUPABASE_CLI_VERSION} --version || true
           npx --yes supabase@${SUPABASE_CLI_VERSION} status || true
+          docker version || true
+          docker info || true
+          docker images || true
           docker ps -a || true
           test -f /tmp/game-action.log && cat /tmp/game-action.log || true
 
-      - name: Stop disposable services
+      - name: Stop disposable runtime
         if: always()
         run: npx --yes supabase@${SUPABASE_CLI_VERSION} stop --no-backup || true
+
+  alpha-gate:
+    name: ALPHA_GATE
+    runs-on: ubuntu-latest
+    needs:
+      - app-validation
+      - database-validation
+      - runtime-validation
+    if: always()
+    steps:
+      - name: Require all critical validation jobs
+        shell: bash
+        run: |
+          echo "APP_VALIDATION=${{ needs.app-validation.result }}"
+          echo "DATABASE_VALIDATION=${{ needs.database-validation.result }}"
+          echo "FULL_RUNTIME_VALIDATION=${{ needs.runtime-validation.result }}"
+          test "${{ needs.app-validation.result }}" = "success"
+          test "${{ needs.database-validation.result }}" = "success"
+          test "${{ needs.runtime-validation.result }}" = "success"
+          echo "READY_FOR_PRIVATE_ALPHA"

@@ -20,6 +20,9 @@ jobs:
     timeout-minutes: 35
     env:
       SUPABASE_CLI_VERSION: 2.117.0
+      # Keep only Postgres, Auth, PostgREST, Kong, and Edge Runtime. The
+      # validation gate does not use these UI/analytics/storage services.
+      SUPABASE_EXCLUDED_SERVICES: realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,logflare,vector,supavisor
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,7 +47,7 @@ jobs:
         shell: bash
         run: |
           for attempt in 1 2 3; do
-            if npx --yes supabase@${SUPABASE_CLI_VERSION} start; then
+            if npx --yes supabase@${SUPABASE_CLI_VERSION} start -x "${SUPABASE_EXCLUDED_SERVICES}"; then
               exit 0
             fi
             if [ "$attempt" -eq 3 ]; then

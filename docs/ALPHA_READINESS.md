@@ -3,7 +3,7 @@
 | Area | Status | Evidence / required follow-up |
 |---|---|---|
 | Authentication | PASS | Supabase Auth and authenticated action boundary implemented. |
-| Database migrations | PASS | `DATABASE_VALIDATION` applied migrations 1-8 from a clean PostgreSQL container in run `35242996712`. |
+| Database migrations | PASS | `DATABASE_VALIDATION` applied migrations 1-9 from a clean PostgreSQL container in run `35373185207`. |
 | RLS | PASS | Runtime smoke verified anonymous denial, ordinary-user admin denial, and authenticated RPC boundaries. |
 | Jobs and crafting | PASS | Unit tests and pgTAP passed in `APP_VALIDATION` and `DATABASE_VALIDATION`. |
 | NPC orders and marketplace | PASS | pgTAP suites passed; marketplace coverage remains source-level plus database regression coverage. |
@@ -17,6 +17,7 @@
 | Backups | WARNING | Procedure documented in `docs/BACKUP_AND_RESTORE.md`; no production data exists for restore rehearsal. |
 | Environment variables | PASS | Existing Supabase environment boundary preserved. |
 | Public deployment | BLOCKED | Deliberately out of scope. |
+| Private Alpha staging deployment | BLOCKED | Commit `e1cd969` is validated, but no dedicated remote Supabase Alpha project, GitHub environment secrets, staging frontend URL, remote backup, or browser QA evidence exists yet. |
 
 ## Required Docker-enabled validation
 
@@ -78,9 +79,9 @@ The workflow now reports independent critical jobs:
 
 Optional local services remain excluded from CI: Realtime, Storage API, imgproxy, Mailpit, Postgres Meta, Studio, Logflare, Vector, and Supavisor.
 
-Authoritative execution status from `Private Alpha Validation` run `35242996712`:
+Authoritative execution status from `Private Alpha Validation` run `35373185207` on commit `e1cd9694f0b8bb7cdfd35685002f4250fdded7d5`:
 
-- Migration 7 runtime status: PASS with migration 8 body-local function conflict correction
+- Migration runtime status: PASS through migration 9, including `202609170009_private_alpha_staging_controls.sql`
 - pgTAP status: PASS, `Files=6`, `Tests=108`, `Result: PASS`
 - Runtime smoke status: PASS
 - Concurrency status: PASS for business slot race and construction reservation replay in runtime smoke
@@ -94,9 +95,16 @@ Authoritative execution status from `Private Alpha Validation` run `35242996712`
 - Branch protection should require `APP_VALIDATION`, `DATABASE_VALIDATION`, `FULL_RUNTIME_VALIDATION`, and `ALPHA_GATE`.
 - A failed migration, pgTAP assertion, runtime smoke test, Edge Function startup, unit test, typecheck, lint, or build blocks promotion.
 
+## Private Alpha deployment status
+
+Current verdict: `BLOCK PRIVATE ALPHA INVITES`.
+
+The repository is ready to attempt a manual private-alpha staging deployment, but the actual remote environment has not been proven. Before testers can be invited, create a dedicated non-production Supabase project, configure the GitHub `private-alpha` environment secrets, run `.github/workflows/deploy-private-alpha.yml`, deploy the frontend to a tester-accessible private/staging URL, run the remote smoke script against that staging project, complete backup/restore evidence, and perform desktop/mobile browser QA. Do not use production Supabase credentials, production domains, blockchain contracts, NFT integrations, or public tester invitations for this gate.
+
 ## Known issues
 
 - Public ECR may still throttle metadata or image pulls; CI now uses official mirror pre-pull/tagging and Docker archive caching to reduce that dependency.
 - Retention percentages are intentionally suppressed until cohorts contain at least five accounts.
 - Phaser is isolated in a vendor chunk but remains approximately 1.48 MB; acceptable for Alpha pending real loading telemetry.
 - Session duration is approximate because browser close delivery is not guaranteed.
+- Remote staging validation remains unperformed until `block-city-alpha` or equivalent is provisioned and validated end-to-end.

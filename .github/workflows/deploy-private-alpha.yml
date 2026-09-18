@@ -1,0 +1,91 @@
+name: Deploy Private Alpha
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_frontend:
+        description: Deploy the frontend after Supabase deployment
+        required: true
+        default: 'false'
+        type: choice
+        options: ['false','true']
+
+concurrency:
+  group: deploy-private-alpha
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  NODE_VERSION: 20
+  SUPABASE_CLI_VERSION: 2.117.0
+  VERCEL_CLI_VERSION: 39.3.0
+
+jobs:
+  deploy-private-alpha:
+    name: PRIVATE_ALPHA_DEPLOYMENT
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: private-alpha
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Require green validation for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          result="$(gh run list --workflow "Private Alpha Validation" --commit "$GITHUB_SHA" --json conclusion,status --limit 1 --jq '.[0] | "\(.status) \(.conclusion)"')"
+          echo "Private Alpha Validation for ${GITHUB_SHA}: ${result}"
+          test "$result" = "completed success"
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend with Alpha public environment
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.ALPHA_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.ALPHA_SUPABASE_ANON_KEY }}
+        run: npm run build
+
+      - name: Link Alpha Supabase project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.ALPHA_SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.ALPHA_SUPABASE_DB_PASSWORD }}
+        run: npx --yes supabase@${SUPABASE_CLI_VERSION} link --project-ref "${{ secrets.ALPHA_SUPABASE_PROJECT_REF }}"
+
+      - name: Apply complete migration chain to Alpha
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.ALPHA_SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.ALPHA_SUPABASE_DB_PASSWORD }}
+        run: npx --yes supabase@${SUPABASE_CLI_VERSION} db push
+
+      - name: Deploy Alpha Edge Function
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.ALPHA_SUPABASE_ACCESS_TOKEN }}
+        run: npx --yes supabase@${SUPABASE_CLI_VERSION} functions deploy game-action --project-ref "${{ secrets.ALPHA_SUPABASE_PROJECT_REF }}"
+
+      - name: Run remote Alpha smoke, RLS, idempotency, and concurrency checks
+        env:
+          ALPHA_SUPABASE_URL: ${{ secrets.ALPHA_SUPABASE_URL }}
+          ALPHA_SUPABASE_ANON_KEY: ${{ secrets.ALPHA_SUPABASE_ANON_KEY }}
+          ALPHA_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.ALPHA_SUPABASE_SERVICE_ROLE_KEY }}
+        run: npm run alpha:remote-smoke
+
+      - name: Deploy Alpha frontend to Vercel preview
+        if: ${{ inputs.deploy_frontend == 'true' }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VITE_SUPABASE_URL: ${{ secrets.ALPHA_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.ALPHA_SUPABASE_ANON_KEY }}
+        run: npx --yes vercel@${VERCEL_CLI_VERSION} deploy --yes --target=preview --token "$VERCEL_TOKEN"

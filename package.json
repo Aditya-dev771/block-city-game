@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "test:integration": "npx supabase test db",
     "test:runtime": "node scripts/ci/runtime-smoke.mjs",
-    "validate:alpha": "npm test && npm run typecheck && npm run lint && npm run build"
+    "validate:alpha": "npm test && npm run typecheck && npm run lint && npm run build",
+    "alpha:remote-smoke": "node scripts/alpha/remote-smoke.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

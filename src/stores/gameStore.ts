@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { BusinessRecipeId, BusinessType, JobType, LocationId, MarketResourceId, PlayerGameState, RecipeId } from '../types/game';
 import { loadPlayerState, performGameAction, saveLocation } from '../services/gameApi';
 import { gameErrorMessage } from '../services/errorMessages';
+import { logClientError, recordAlphaCohortEvent } from '../services/alphaOps';
 
 interface GameStore {
   player: PlayerGameState | null;
@@ -37,8 +38,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
   player: null, loading: false, actionPending: false, error: null, notice: null, lastMarketExecution: null, panel: 'world',
   load: async () => {
     set({ loading: true, error: null });
-    try { set({ player: await loadPlayerState(), loading: false }); }
-    catch (error) { set({ error: error instanceof Error ? error.message : 'Could not load your town.', loading: false }); }
+    try {
+      const player = await loadPlayerState();
+      set({ player, loading: false });
+
+      quietly(recordAlphaCohortEvent('ACTIVE'));
+      if (player.resident.jobsCompleted > 0) quietly(recordAlphaCohortEvent('FIRST_JOB'));
+      if (player.resident.tradesCompleted > 0) quietly(recordAlphaCohortEvent('REACHED_MARKET'));
+      if (player.property.level >= 2) quietly(recordAlphaCohortEvent('PROPERTY_LEVEL_2'));
+      if (player.businesses.length > 0) quietly(recordAlphaCohortEvent('OPENED_BUSINESS'));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not load your town.';
+      quietly(logClientError({ errorCode: 'LOAD_STATE_FAILED', context: { message } }));
+      set({ error: message, loading: false });
+    }
   },
   setPanel: (panel) => set({ panel }),
   arriveAt: async (location) => {
@@ -47,7 +60,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const nextPanel = location === 'town-hall' ? 'quests' : location === 'workshop' ? 'crafting' : location === 'market' ? 'market' : location === 'home' ? 'property' : 'world';
     set({ player: { ...prior, resident: { ...prior.resident, currentLocation: location } }, panel: nextPanel });
     try { await saveLocation(location); }
-    catch { set({ player: prior, panel: 'world', error: 'Location could not be saved.' }); }
+    catch {
+      quietly(logClientError({
+        errorCode: 'LOCATION_SAVE_FAILED',
+        actionType: 'set_current_location',
+        context: { location }
+      }));
+      set({ player: prior, panel: 'world', error: 'Location could not be saved.' });
+    }
   },
   executeJob: async (jobType) => runAction(set, get, { action: 'execute_job', jobType }),
   craftItem: async (recipeId) => runAction(set, get, { action: 'craft_item', recipeId }),
@@ -71,6 +91,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 type StoreSet = (partial: Partial<GameStore>) => void;
 type StoreGet = () => GameStore;
 type Intent = Parameters<typeof performGameAction>[0];
+const quietly = (promise: Promise<unknown>) => { void promise.catch(() => undefined); };
 
 async function runAction(set: StoreSet, get: StoreGet, intent: Intent): Promise<void> {
     if (get().actionPending) return;
@@ -79,8 +100,17 @@ async function runAction(set: StoreSet, get: StoreGet, intent: Intent): Promise<
       const result = await performGameAction(intent, crypto.randomUUID());
       const execution = result.execution ? `${result.execution.side === 'buy' ? 'Bought' : 'Sold'} ${result.execution.quantity} ${result.execution.resource} at ${result.execution.unitPrice} Coins each · Fee ${result.execution.fee}` : null;
       set({ player: result.state, notice: execution ?? result.message, lastMarketExecution: execution, actionPending: false });
+      if (intent.action === 'execute_job') quietly(recordAlphaCohortEvent('FIRST_JOB'));
+      if (intent.action === 'market_buy' || intent.action === 'market_sell') quietly(recordAlphaCohortEvent('REACHED_MARKET'));
+      if (intent.action === 'upgrade_property') quietly(recordAlphaCohortEvent('PROPERTY_LEVEL_2'));
+      if (intent.action === 'open_business') quietly(recordAlphaCohortEvent('OPENED_BUSINESS'));
     } catch (error) {
       const message = gameErrorMessage(error instanceof Error ? error.message : 'UNKNOWN_ERROR');
+      quietly(logClientError({
+        errorCode: error instanceof Error ? error.message : 'UNKNOWN_ERROR',
+        actionType: intent.action,
+        context: { mappedMessage: message }
+      }));
       try { set({ player: await loadPlayerState(), error: message, actionPending: false }); }
       catch { set({ error: `${message} State refresh failed; reconnect before trying again.`, actionPending: false }); }
     }

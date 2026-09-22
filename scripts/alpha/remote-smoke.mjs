@@ -78,7 +78,9 @@ await action(first,{action:'execute_job',jobType:'miner'});
 await first.client.rpc('set_current_location',{next_location:'farm'});
 await action(first,{action:'execute_job',jobType:'farmer'});
 
-await admin.from('player_resources').update({amount:80}).eq('player_id',first.id).in('resource',['wood','stone','iron','food']).throwOnError();
+await admin.from('player_resources').update({amount:20}).eq('player_id',first.id).eq('resource','wood').throwOnError();
+await admin.from('player_resources').update({amount:16}).eq('player_id',first.id).eq('resource','stone').throwOnError();
+await admin.from('player_resources').update({amount:0}).eq('player_id',first.id).in('resource',['iron','food']).throwOnError();
 await admin.from('player_economy').update({coins:5000}).eq('player_id',first.id).throwOnError();
 await first.client.rpc('set_current_location',{next_location:'workshop'});
 await action(first,{action:'craft_item',recipeId:'planks'});

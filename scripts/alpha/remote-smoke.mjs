@@ -35,6 +35,19 @@ async function action(player,body){
   return result.json;
 }
 
+async function setResource(playerId,resource,amount){
+  await admin.from('player_resources').update({amount}).eq('player_id',playerId).eq('resource',resource).throwOnError();
+}
+
+async function assertStorageWithinCapacity(playerId,label){
+  const resources=await admin.from('player_resources').select('amount').eq('player_id',playerId);
+  assert.ifError(resources.error);
+  const property=await admin.from('properties').select('storage_capacity').eq('player_id',playerId).single();
+  assert.ifError(property.error);
+  const used=resources.data.reduce((total,row)=>total+row.amount,0);
+  assert(used<=property.data.storage_capacity,`${label} exceeds storage: ${used}/${property.data.storage_capacity}`);
+}
+
 const first=await invitedPlayer('SmokeOne');
 const second=await invitedPlayer('SmokeTwo');
 const adminUser=await invitedPlayer('SmokeAdmin');
@@ -78,9 +91,11 @@ await action(first,{action:'execute_job',jobType:'miner'});
 await first.client.rpc('set_current_location',{next_location:'farm'});
 await action(first,{action:'execute_job',jobType:'farmer'});
 
-await admin.from('player_resources').update({amount:20}).eq('player_id',first.id).eq('resource','wood').throwOnError();
-await admin.from('player_resources').update({amount:16}).eq('player_id',first.id).eq('resource','stone').throwOnError();
-await admin.from('player_resources').update({amount:0}).eq('player_id',first.id).in('resource',['iron','food']).throwOnError();
+await setResource(first.id,'wood',25);
+await setResource(first.id,'stone',14);
+await setResource(first.id,'iron',2);
+await setResource(first.id,'food',5);
+await assertStorageWithinCapacity(first.id,'pre-bridge fixture resources');
 await admin.from('player_economy').update({coins:5000}).eq('player_id',first.id).throwOnError();
 await first.client.rpc('set_current_location',{next_location:'workshop'});
 await action(first,{action:'craft_item',recipeId:'planks'});
@@ -95,13 +110,20 @@ assert.deepEqual(marketB.json.transactionId,marketA.json.transactionId,'duplicat
 await Promise.all([action(first,{action:'market_sell',resourceId:'food',quantity:1}),action(first,{action:'market_sell',resourceId:'food',quantity:1})]);
 
 await first.client.rpc('set_current_location',{next_location:'home'});
+await setResource(first.id,'wood',40);
+await assertStorageWithinCapacity(first.id,'wood construction fixture resources');
 const reserveKey=crypto.randomUUID();
 const reserveA=await edge(first.token,{action:'fund_property_upgrade',targetLevel:2,idempotencyKey:reserveKey});
 const reserveB=await edge(first.token,{action:'fund_property_upgrade',targetLevel:2,idempotencyKey:reserveKey});
 assert.equal(reserveA.response.ok,true,'construction reservation must pass');
 assert.deepEqual(reserveB.json.transactionId,reserveA.json.transactionId,'duplicate construction reservation must replay');
+await setResource(first.id,'stone',25);
+await assertStorageWithinCapacity(first.id,'stone construction fixture resources');
+await action(first,{action:'fund_property_upgrade',targetLevel:2});
 await action(first,{action:'upgrade_property',targetLevel:2});
 
+await setResource(first.id,'wood',4);
+await assertStorageWithinCapacity(first.id,'post-upgrade production fixture resources');
 const businessRace=await Promise.all([edge(first.token,{action:'open_business',businessType:'restaurant',idempotencyKey:crypto.randomUUID()}),edge(first.token,{action:'open_business',businessType:'workshop',idempotencyKey:crypto.randomUUID()})]);
 assert.equal(businessRace.filter((item)=>item.response.ok).length,1,'business slot race must allow exactly one open');
 const stateAfterBusiness=businessRace.find((item)=>item.response.ok).json.state;

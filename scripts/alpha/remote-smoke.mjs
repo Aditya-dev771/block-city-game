@@ -13,7 +13,7 @@ const admin=createClient(url,serviceKey,clientOptions);
 const password=`Alpha-smoke-${crypto.randomUUID()}!1`;
 
 async function invitedPlayer(label){
-  const email=`${label}-${crypto.randomUUID()}@alpha-smoke.example`;
+  const email=`${label}-${crypto.randomUUID()}@alpha-smoke.example`.toLowerCase();
   await admin.from('alpha_invites').upsert({email,label:'remote smoke',active:true}).throwOnError();
   const created=await admin.auth.admin.createUser({email,password,email_confirm:true,user_metadata:{username:label}});
   assert.ifError(created.error);

@@ -56,8 +56,9 @@ assert.equal(hiddenProfile.data.length,0,'Player A must not read Player B profil
 const beforeOther=await admin.from('player_economy').select('coins').eq('player_id',second.id).single();
 assert.ifError(beforeOther.error);
 const mutateOther=await first.client.from('player_economy').update({coins:999999}).eq('player_id',second.id).select();
-assert.ifError(mutateOther.error);
-assert.equal(mutateOther.data.length,0,'Player A update must not see Player B economy row');
+assert(mutateOther.error,'Player A must be denied direct economy mutation');
+assert.equal(mutateOther.error.code,'42501','Player A economy mutation must be rejected by RLS');
+assert.equal(mutateOther.data?.length ?? 0,0,'Player A update must not return Player B economy rows');
 const afterOther=await admin.from('player_economy').select('coins').eq('player_id',second.id).single();
 assert.ifError(afterOther.error);
 assert.equal(afterOther.data.coins,beforeOther.data.coins,'Player A must not mutate Player B economy');

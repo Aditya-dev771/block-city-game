@@ -21,7 +21,7 @@ permissions:
 env:
   NODE_VERSION: 20
   SUPABASE_CLI_VERSION: 2.117.0
-  VERCEL_CLI_VERSION: 39.3.0
+  VERCEL_CLI_VERSION: 47.2.0
 
 jobs:
   deploy-private-alpha:

@@ -48,6 +48,18 @@ async function assertStorageWithinCapacity(playerId,label){
   assert(used<=property.data.storage_capacity,`${label} exceeds storage: ${used}/${property.data.storage_capacity}`);
 }
 
+async function ensureDailyOrder(player,orderId){
+  const state=await player.client.rpc('get_player_game_state');
+  assert.ifError(state.error);
+  const orders=await admin.from('player_daily_orders').select('order_date,order_id,slot').eq('player_id',player.id).order('slot');
+  assert.ifError(orders.error);
+  assert.equal(orders.data.length,3,'daily order fixture must contain three orders');
+  if(orders.data.some((order)=>order.order_id===orderId)) return;
+  const replaced=await admin.from('player_daily_orders').update({order_id:orderId}).eq('player_id',player.id).eq('order_date',orders.data[0].order_date).eq('slot',orders.data[0].slot).select('order_id').single();
+  assert.ifError(replaced.error);
+  assert.equal(replaced.data.order_id,orderId,'daily order fixture must activate the requested order');
+}
+
 const first=await invitedPlayer('SmokeOne');
 const second=await invitedPlayer('SmokeTwo');
 const adminUser=await invitedPlayer('SmokeAdmin');
@@ -96,6 +108,7 @@ await setResource(first.id,'stone',14);
 await setResource(first.id,'iron',2);
 await setResource(first.id,'food',5);
 await assertStorageWithinCapacity(first.id,'pre-bridge fixture resources');
+await ensureDailyOrder(first,'repair_old_bridge');
 await admin.from('player_economy').update({coins:5000}).eq('player_id',first.id).throwOnError();
 await first.client.rpc('set_current_location',{next_location:'workshop'});
 await action(first,{action:'craft_item',recipeId:'planks'});

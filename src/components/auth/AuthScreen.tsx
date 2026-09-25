@@ -6,8 +6,14 @@ export function AuthScreen() {
   const [mode, setMode] = useState<'login' | 'signup'>('login'); const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [username, setUsername] = useState(''); const [busy, setBusy] = useState(false); const [message, setMessage] = useState('');
   async function submit(event: FormEvent) {
     event.preventDefault(); setBusy(true); setMessage('');
-    const result = mode === 'signup' ? await supabase.auth.signUp({ email, password, options: { data: { username: username.trim() } } }) : await supabase.auth.signInWithPassword({ email, password });
-    setBusy(false); if (result.error) setMessage(result.error.message.includes('ALPHA_INVITE_REQUIRED')?'This Private Alpha is invite-only. Use the email address that was approved for testing.':result.error.message); else if (mode === 'signup' && !result.data.session) setMessage('Check your email to confirm your account.');
+    const normalizedEmail=email.trim().toLowerCase();
+    if(mode==='signup'){
+      const approval=await supabase.rpc('is_alpha_email_approved',{requested_email:normalizedEmail});
+      if(approval.error){setBusy(false);setMessage('Unable to verify your Private Alpha invitation. Please try again later.');return;}
+      if(!approval.data){setBusy(false);setMessage('This email is not approved for the Private Alpha.');return;}
+    }
+    const result = mode === 'signup' ? await supabase.auth.signUp({ email:normalizedEmail, password, options: { data: { username: username.trim() } } }) : await supabase.auth.signInWithPassword({ email:normalizedEmail, password });
+    setBusy(false); if (result.error) setMessage(result.error.message); else if (mode === 'signup' && !result.data.session) setMessage('Check your email to confirm your account.');
   }
   return <main className="min-h-dvh bg-ink p-4 text-cream sm:grid sm:place-items-center">
     <div className="mx-auto grid min-h-[calc(100dvh-2rem)] max-w-5xl overflow-hidden rounded-3xl bg-[#254632] shadow-2xl sm:min-h-0 sm:grid-cols-[1.1fr_.9fr]">

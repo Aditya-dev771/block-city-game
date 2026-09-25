@@ -3,9 +3,16 @@ import type { BusinessRecipeId, BusinessType, JobType, LocationId, MarketResourc
 import { loadPlayerState, performGameAction, saveLocation } from '../services/gameApi';
 import { gameErrorMessage } from '../services/errorMessages';
 import { logClientError, recordAlphaCohortEvent } from '../services/alphaOps';
+import { GUEST_PLAYER_STATE } from '../config/guestState';
+import { loadCitizenAccess, type CitizenAccess } from '../services/walletAuth';
 
 interface GameStore {
   player: PlayerGameState | null;
+  authenticated: boolean;
+  accessState: CitizenAccess['state'];
+  walletAddress: string | null;
+  accessMessage: string | null;
+  authRequest: 'prompt' | 'wallet' | 'legacy' | null;
   loading: boolean;
   actionPending: boolean;
   error: string | null;
@@ -13,6 +20,8 @@ interface GameStore {
   lastMarketExecution: string | null;
   panel: 'world' | 'bag' | 'crafting' | 'market' | 'property' | 'businesses' | 'quests' | 'profile';
   load: () => Promise<void>;
+  requestAuth: (mode?: 'prompt' | 'wallet' | 'legacy') => void;
+  dismissAuth: () => void;
   setPanel: (panel: GameStore['panel']) => void;
   arriveAt: (location: LocationId) => Promise<void>;
   executeJob: (jobType: JobType) => Promise<void>;
@@ -35,12 +44,14 @@ interface GameStore {
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
-  player: null, loading: false, actionPending: false, error: null, notice: null, lastMarketExecution: null, panel: 'world',
+  player: GUEST_PLAYER_STATE, authenticated: false, accessState:'explorer', walletAddress:null, accessMessage:null, authRequest: null, loading: false, actionPending: false, error: null, notice: null, lastMarketExecution: null, panel: 'world',
   load: async () => {
     set({ loading: true, error: null });
     try {
+      const access=await loadCitizenAccess();
+      if(!access.eligible){set({player:GUEST_PLAYER_STATE,authenticated:false,accessState:access.state,walletAddress:access.walletAddress,accessMessage:access.message,authRequest:null,loading:false});return;}
       const player = await loadPlayerState();
-      set({ player, loading: false });
+      set({ player, authenticated: true, accessState:'citizen',walletAddress:access.walletAddress,accessMessage:access.message, authRequest: null, loading: false });
 
       quietly(recordAlphaCohortEvent('ACTIVE'));
       if (player.resident.jobsCompleted > 0) quietly(recordAlphaCohortEvent('FIRST_JOB'));
@@ -50,15 +61,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not load your town.';
       quietly(logClientError({ errorCode: 'LOAD_STATE_FAILED', context: { message } }));
-      set({ error: message, loading: false });
+      set({ player:GUEST_PLAYER_STATE,authenticated:false,accessState:'unavailable',accessMessage:message,authRequest:null,error: message, loading: false });
     }
   },
+  requestAuth: (authRequest='prompt') => set({ authRequest }),
+  dismissAuth: () => set({ authRequest: null }),
   setPanel: (panel) => set({ panel }),
   arriveAt: async (location) => {
     const prior = get().player;
     if (!prior) return;
     const nextPanel = location === 'town-hall' ? 'quests' : location === 'workshop' ? 'crafting' : location === 'market' ? 'market' : location === 'home' ? 'property' : 'world';
     set({ player: { ...prior, resident: { ...prior.resident, currentLocation: location } }, panel: nextPanel });
+    if (!get().authenticated) return;
     try { await saveLocation(location); }
     catch {
       quietly(logClientError({
@@ -85,7 +99,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   claimWeeklyStreak:async()=>runAction(set,get,{action:'claim_weekly_streak'}),
   claimAchievement:async(achievementId)=>runAction(set,get,{action:'claim_achievement',achievementId}),
   dismissMessage: () => set({ error: null, notice: null }),
-  clear: () => set({ player: null, panel: 'world', error: null, notice: null, lastMarketExecution: null })
+  clear: () => set({ player: GUEST_PLAYER_STATE, authenticated: false, accessState:'explorer',walletAddress:null,accessMessage:null,authRequest: null, panel: 'world', error: null, notice: null, lastMarketExecution: null })
 }));
 
 type StoreSet = (partial: Partial<GameStore>) => void;
@@ -94,6 +108,7 @@ type Intent = Parameters<typeof performGameAction>[0];
 const quietly = (promise: Promise<unknown>) => { void promise.catch(() => undefined); };
 
 async function runAction(set: StoreSet, get: StoreGet, intent: Intent): Promise<void> {
+    if (!get().authenticated) { set({ authRequest: 'prompt' }); return; }
     if (get().actionPending) return;
     set({ actionPending: true, error: null, notice: null });
     try {

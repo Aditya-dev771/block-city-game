@@ -13,6 +13,9 @@ const categories: Array<{ id: FeedbackCategory; label: string }> = [
 
 export function AlphaBanner() {
   const [open, setOpen] = useState(false);
+  const authenticated = useGameStore((state) => state.authenticated);
+  const requestAuth = useGameStore((state) => state.requestAuth);
+  const openFeedback = () => authenticated ? setOpen(true) : requestAuth();
   return <>
     <div className="absolute left-2 top-[4.5rem] z-30 flex max-w-[calc(100%-5rem)] items-center gap-2 rounded-xl border border-gold/40 bg-ink/85 px-3 py-2 text-xs text-cream shadow-lg backdrop-blur">
       <Flag className="h-4 w-4 shrink-0 text-gold" />
@@ -20,7 +23,7 @@ export function AlphaBanner() {
         <p className="font-bold tracking-wide">PRIVATE ALPHA</p>
         <p className="truncate text-cream/65">Progress and economy values may change during testing.</p>
       </div>
-      <button onClick={() => setOpen(true)} className="ml-1 rounded-lg bg-gold px-2 py-1 font-bold text-ink">Report Issue</button>
+      <button onClick={openFeedback} className="ml-1 rounded-lg bg-gold px-2 py-1 font-bold text-ink">Report Issue</button>
     </div>
     {open ? <FeedbackDialog onClose={() => setOpen(false)} /> : null}
   </>;

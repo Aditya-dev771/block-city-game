@@ -3,7 +3,9 @@ import { useGameStore } from '../../stores/gameStore';
 
 export function Hud() {
   const player = useGameStore((state) => state.player);
+  const authenticated = useGameStore((state) => state.authenticated);
   if (!player) return null;
+  if(!authenticated)return <header className="absolute inset-x-2 top-2 z-20 flex justify-center"><div className="rounded-xl border border-white/20 bg-ink/90 px-4 py-2 text-sm font-bold text-cream shadow-lg backdrop-blur"><span className="text-gold">Guest</span> · Explore Block City</div></header>;
   const stats = [
     { label: 'Level', value: player.resident.level, icon: ShieldCheck },
     { label: 'Coins', value: player.economy.coins, icon: Coins },

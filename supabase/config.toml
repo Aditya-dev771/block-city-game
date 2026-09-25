@@ -19,5 +19,8 @@ site_url = "http://localhost:5173"
 additional_redirect_urls = ["http://127.0.0.1:5173"]
 enable_signup = true
 
+[auth.web3.ethereum]
+enabled = true
+
 [functions.game-action]
 verify_jwt = true

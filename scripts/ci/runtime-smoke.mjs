@@ -16,7 +16,7 @@ class RuntimeSmokeWebSocket {
 const clientOptions={auth:{persistSession:false},realtime:{transport:RuntimeSmokeWebSocket}};
 const admin=createClient(url,serviceKey,clientOptions);
 const password='Runtime-only-password-7!';
-async function player(label){const email=`${label}-${crypto.randomUUID()}@example.test`;const{data,error}=await admin.auth.admin.createUser({email,password,email_confirm:true,user_metadata:{username:label}});assert.ifError(error);const client=createClient(url,anonKey,clientOptions);const login=await client.auth.signInWithPassword({email,password});assert.ifError(login.error);return{id:data.user.id,client};}
+async function player(label){const email=`${label}-${crypto.randomUUID()}@example.test`;const{data,error}=await admin.auth.admin.createUser({email,password,email_confirm:true,user_metadata:{username:label}});assert.ifError(error);await admin.from('citizen_access_grants').insert({user_id:data.user.id,access_source:'legacy_alpha',nft_balance:0,verified_at:new Date().toISOString(),expires_at:new Date(Date.now()+300_000).toISOString()}).throwOnError();const client=createClient(url,anonKey,clientOptions);const login=await client.auth.signInWithPassword({email,password});assert.ifError(login.error);return{id:data.user.id,client};}
 const first=await player('RuntimeOne');const second=await player('RuntimeTwo');
 await admin.from('properties').update({level:2,storage_capacity:100,resident_capacity:3,business_slots:1}).eq('player_id',first.id).throwOnError();
 await admin.from('player_economy').update({coins:3000}).eq('player_id',first.id).throwOnError();

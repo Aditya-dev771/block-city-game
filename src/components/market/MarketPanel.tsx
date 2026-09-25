@@ -10,10 +10,10 @@ const QUICK_QUANTITIES = [1,5,10] as const;
 
 function MarketResourceCard({ resource, atMarket }: { resource: MarketResource; atMarket: boolean }) {
   const [side,setSide]=useState<MarketSide>('buy'); const [quantity,setQuantity]=useState(1);
-  const player=useGameStore((state)=>state.player); const pending=useGameStore((state)=>state.actionPending); const trade=useGameStore((state)=>state.tradeMarket);
+  const player=useGameStore((state)=>state.player); const authenticated=useGameStore((state)=>state.authenticated); const pending=useGameStore((state)=>state.actionPending); const trade=useGameStore((state)=>state.tradeMarket);
   if(!player) return null;
   const gross=resource.currentPrice*quantity; const fee=marketplaceFee(gross); const finalAmount=side==='buy' ? gross+fee : gross-fee;
-  const owned=player.inventory[resource.resourceId]; const unavailable=side==='buy' ? resource.currentSupply<quantity || player.economy.coins<finalAmount : owned<quantity;
+  const owned=player.inventory[resource.resourceId]; const unavailable=authenticated&&(side==='buy' ? resource.currentSupply<quantity || player.economy.coins<finalAmount : owned<quantity);
   return <article className="rounded-2xl border border-ink/10 bg-white p-4 shadow-sm">
     <div className="flex items-start justify-between"><div className="flex gap-3"><span className="text-3xl" aria-hidden="true">{ICONS[resource.resourceId]}</span><div><h3 className="font-display text-lg font-bold capitalize">{resource.resourceId}</h3><p className="text-xs text-ink/50">Supply {resource.currentSupply} · You own {owned}</p></div></div><strong className="rounded-lg bg-gold/15 px-2.5 py-1 text-ink">{resource.currentPrice} Coins</strong></div>
     <div className="mt-4 grid grid-cols-2 rounded-xl bg-ink/5 p-1"><button onClick={()=>setSide('buy')} className={`rounded-lg py-2 text-sm font-bold ${side==='buy'?'bg-white text-moss shadow':'text-ink/50'}`}>Buy</button><button onClick={()=>setSide('sell')} className={`rounded-lg py-2 text-sm font-bold ${side==='sell'?'bg-white text-clay shadow':'text-ink/50'}`}>Sell</button></div>

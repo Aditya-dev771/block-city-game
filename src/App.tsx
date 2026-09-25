@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { LogOut } from 'lucide-react';
-import { supabase } from './services/supabase';
+import { supabase, supabaseConfigurationError } from './services/supabase';
 import { useGameStore } from './stores/gameStore';
 import { AuthScreen } from './components/auth/AuthScreen';
 import { GameCanvas } from './game/GameCanvas';
@@ -14,7 +14,13 @@ import { AlphaDebugPanel } from './components/debug/AlphaDebugPanel';
 import { AlphaBanner } from './components/alpha/AlphaBanner';
 import { endObservedSession, heartbeatObservedSession, startObservedSession } from './services/sessionTelemetry';
 
-export default function App(){return window.location.pathname==='/admin/economy'?<AdminEconomyPage/>:window.location.pathname==='/admin/health'?<AlphaHealthPage/>:<GameApp/>}
+export default function App(){
+ if(supabaseConfigurationError)return <ConfigurationError message={supabaseConfigurationError}/>;
+ return window.location.pathname==='/admin/economy'?<AdminEconomyPage/>:window.location.pathname==='/admin/health'?<AlphaHealthPage/>:<GameApp/>;
+}
+function ConfigurationError({message}:{message:string}){
+ return <main className="grid min-h-dvh place-items-center bg-ink p-6 text-center text-cream"><section className="max-w-lg rounded-2xl border border-red-200/20 bg-white/10 p-6"><p className="text-xs font-bold uppercase tracking-widest text-red-200">Configuration error</p><h1 className="mt-2 font-display text-2xl font-bold">Block City cannot start</h1><p role="alert" className="mt-3 text-sm text-cream/80">{message}</p><p className="mt-4 text-xs text-cream/60">No credentials are displayed. Please contact the Private Alpha administrator.</p></section></main>;
+}
 function GameApp(){
  const[session,setSession]=useState<Session|null>(null);const[checking,setChecking]=useState(true);const player=useGameStore(s=>s.player);const error=useGameStore(s=>s.error);const load=useGameStore(s=>s.load);const clear=useGameStore(s=>s.clear);
  useEffect(()=>{void supabase.auth.getSession().then(({data})=>{setSession(data.session);setChecking(false)});const{data}=supabase.auth.onAuthStateChange((_event,next)=>setSession(next));return()=>data.subscription.unsubscribe()},[]);

@@ -50,12 +50,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build frontend with Alpha public environment
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.ALPHA_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.ALPHA_SUPABASE_ANON_KEY }}
-        run: npm run build
-
       - name: Link Alpha Supabase project
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.ALPHA_SUPABASE_ACCESS_TOKEN }}
@@ -88,7 +82,7 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: npx --yes vercel@${VERCEL_CLI_VERSION} pull --yes --environment=preview --token "$VERCEL_TOKEN"
 
-      - name: Deploy Alpha frontend to Vercel preview
+      - name: Build Alpha frontend for Vercel preview
         if: ${{ inputs.deploy_frontend == 'true' }}
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -96,4 +90,12 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VITE_SUPABASE_URL: ${{ secrets.ALPHA_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.ALPHA_SUPABASE_ANON_KEY }}
-        run: npx --yes vercel@${VERCEL_CLI_VERSION} deploy --yes --target=preview --token "$VERCEL_TOKEN"
+        run: npx --yes vercel@${VERCEL_CLI_VERSION} build --token "$VERCEL_TOKEN"
+
+      - name: Deploy Alpha frontend to Vercel preview
+        if: ${{ inputs.deploy_frontend == 'true' }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: npx --yes vercel@${VERCEL_CLI_VERSION} deploy --prebuilt --yes --target=preview --token "$VERCEL_TOKEN"
